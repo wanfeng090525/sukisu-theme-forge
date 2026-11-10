@@ -59,7 +59,7 @@ class EditorViewModel : ViewModel() {
             .isSuccess
     }
 
-    fun setError(text: String) {
+    fun reportError(text: String) {
         error = text
     }
 

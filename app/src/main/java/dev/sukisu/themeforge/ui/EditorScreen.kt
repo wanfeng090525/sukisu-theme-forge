@@ -104,7 +104,7 @@ fun EditorScreen(vm: EditorViewModel, doc: ThemeDocument) {
         if (uri != null && bytes != null) {
             runCatching { FileIo.write(context, uri, bytes) }
                 .onSuccess { vm.notify("已导出 ${formatBytes(bytes.size.toLong())}") }
-                .onFailure { vm.setError(it.message ?: "写入文件失败") }
+                .onFailure { vm.reportError(it.message ?: "写入文件失败") }
         }
     }
 
@@ -124,7 +124,7 @@ fun EditorScreen(vm: EditorViewModel, doc: ThemeDocument) {
                     }
                 }.onFailure {
                     exporting = false
-                    vm.setError(it.message ?: "导出失败")
+                    vm.reportError(it.message ?: "导出失败")
                 }
             }
         }
@@ -460,7 +460,7 @@ private fun ImagesTab(
                     }
                 }
                 result.onSuccess { doc.putImage(slot, it) }
-                    .onFailure { vm.setError(it.message ?: "读取图片失败") }
+                    .onFailure { vm.reportError(it.message ?: "读取图片失败") }
             }
         }
     }

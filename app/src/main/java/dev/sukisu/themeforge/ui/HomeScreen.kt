@@ -79,7 +79,7 @@ fun HomeScreen(vm: EditorViewModel) {
                     runCatching { FileIo.read(context, uri, 128L * 1024 * 1024) }
                 }
                 result.onSuccess { vm.openPackage(it, name) }
-                    .onFailure { vm.setError(it.message ?: "读取文件失败") }
+                    .onFailure { vm.reportError(it.message ?: "读取文件失败") }
                 busy = false
             }
         }
