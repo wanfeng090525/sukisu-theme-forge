@@ -325,7 +325,7 @@ private fun ExportDialog(
                     FilterChipSafe(
                         selected = options.singleVariant,
                         label = "兼容 v2 单套"
-                    ) { onOptionsChange(options.copy(singleVariant = it)) }
+                    ) { onOptionsChange(options.copy(singleVariant = !options.singleVariant)) }
                 }
                 Text(
                     "内容最低需求 v${doc.requiredVersion()}，选择更低的版本会自动提升。",
