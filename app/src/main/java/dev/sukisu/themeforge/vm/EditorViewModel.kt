@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import dev.sukisu.themeforge.core.ThemeDocument
 import dev.sukisu.themeforge.core.ThemePackager
+import dev.sukisu.themeforge.core.ThemeSchema
 import org.json.JSONObject
 
 class EditorViewModel : ViewModel() {
@@ -22,9 +23,13 @@ class EditorViewModel : ViewModel() {
     var error by mutableStateOf<String?>(null)
         private set
 
+    var jsonError by mutableStateOf<String?>(null)
+        private set
+
     fun newTheme() {
         doc = ThemeDocument.blank()
         projectName = "MyTheme"
+        jsonError = null
         message = "已创建空白自适应主题"
     }
 
@@ -40,6 +45,11 @@ class EditorViewModel : ViewModel() {
 
     fun close() {
         doc = null
+        jsonError = null
+    }
+
+    fun renameProject(name: String) {
+        projectName = name
     }
 
     fun buildPackage(): ByteArray? = doc?.let { ThemePackager.build(it) }
@@ -51,12 +61,29 @@ class EditorViewModel : ViewModel() {
         return "$safe.sukisu"
     }
 
+    fun loadFullTemplate(): Boolean {
+        val current = doc ?: return false
+        jsonError = null
+        return runCatching { current.replaceRoot(ThemeSchema.fullTemplate()) }
+            .onSuccess { message = "已载入完整字段模板" }
+            .onFailure { jsonError = it.message ?: "模板生成失败" }
+            .isSuccess
+    }
+
     fun applyJson(text: String): Boolean {
         val current = doc ?: return false
+        jsonError = null
         return runCatching { current.replaceRoot(JSONObject(text)) }
             .onSuccess { message = "JSON 已应用" }
-            .onFailure { error = it.message ?: "JSON 无效" }
+            .onFailure { jsonError = it.message ?: "JSON 无效" }
             .isSuccess
+    }
+
+    fun formatJson(text: String): String? {
+        jsonError = null
+        return runCatching { JSONObject(text).toString(2) }
+            .onFailure { jsonError = it.message ?: "JSON 无效" }
+            .getOrNull()
     }
 
     fun reportError(text: String) {

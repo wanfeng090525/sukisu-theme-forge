@@ -162,8 +162,10 @@ fun HomeScreen(vm: EditorViewModel) {
                 )
                 Spacer(Modifier.height(10.dp))
                 FeatureRow("明暗双主题", "light / dark 两套颜色、图片和布局独立编辑")
-                FeatureRow("图片槽位", "壁纸、首页卡片、最多 3 个贴纸，自动写入对应 ZIP 条目")
-                FeatureRow("格式校验", "按 v3 / v4 / v5 能力自动提升版本，导出前检查字段")
+                FeatureRow("全部字段", "外观令牌、首页布局、模块排序、交互开关、自定义文案")
+                FeatureRow("底栏 Dock", "替换 4 个底栏图标，悬浮栏、模糊、角标与手势开关")
+                FeatureRow("图片槽位", "壁纸、首页卡片、最多 5 个贴纸 + 位置/旋转/大小")
+                FeatureRow("JSON 编辑", "一键载入完整字段模板，格式化、校验、应用")
                 FeatureRow("一键导出", "生成 theme.json + 图片，AES-256-GCM 加密为 .sukisu")
 
                 Spacer(Modifier.height(22.dp))
@@ -191,7 +193,7 @@ fun HomeScreen(vm: EditorViewModel) {
 
                 Spacer(Modifier.height(26.dp))
                 Text(
-                    "v1.0.0 · 非官方工具",
+                    "v2.0.0 · 非官方工具",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

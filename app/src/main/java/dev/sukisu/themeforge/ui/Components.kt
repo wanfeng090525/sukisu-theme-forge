@@ -1,5 +1,8 @@
 package dev.sukisu.themeforge.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,16 +37,27 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.sukisu.themeforge.core.FileIo
+import dev.sukisu.themeforge.core.ImageAsset
+import dev.sukisu.themeforge.core.ImageInfo
+import dev.sukisu.themeforge.core.ThemeDocument
+import dev.sukisu.themeforge.core.formatBytes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SectionCard(
@@ -255,6 +270,127 @@ fun InfoRow(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontFamily = FontFamily.Monospace
         )
+    }
+}
+
+@Composable
+fun IntSliderRow(
+    label: String,
+    value: Int,
+    range: IntRange,
+    unit: String = "",
+    onValueChange: (Int) -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text(
+                "$value$unit",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        Slider(
+            value = value.toFloat().coerceIn(range.first.toFloat(), range.last.toFloat()),
+            onValueChange = { onValueChange(it.toInt().coerceIn(range.first, range.last)) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            steps = (range.last - range.first - 1).coerceAtLeast(0)
+        )
+    }
+}
+
+@Composable
+fun TextInputRow(
+    label: String,
+    value: String,
+    placeholder: String = "",
+    singleLine: Boolean = true,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = { if (placeholder.isNotEmpty()) Text(placeholder) },
+        singleLine = singleLine,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    )
+}
+
+@Composable
+fun ImageSlotCard(
+    doc: ThemeDocument,
+    slot: String,
+    title: String,
+    subtitle: String,
+    aspect: Float = 2.2f,
+    onError: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val asset = doc.images[slot]
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val bytes = FileIo.read(context, uri, 64L * 1024 * 1024)
+                    val size = ImageInfo.decodeSize(bytes) ?: error("图片无法解码")
+                    ImageAsset(bytes, slot, size.first, size.second)
+                }
+            }.onSuccess { doc.putImage(slot, it) }
+                .onFailure { onError(it.message ?: "读取图片失败") }
+        }
+    }
+    val preview = remember(asset) { asset?.let { ImageInfo.preview(it.bytes, 420) } }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
+            .padding(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                if (asset == null) "未设置" else "${asset.width}×${asset.height} · ${formatBytes(asset.bytes.size.toLong())}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(10.dp))
+        if (preview != null) {
+            Image(
+                bitmap = preview,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(aspect)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { launcher.launch(arrayOf("image/*")) }) {
+                Text(if (asset == null) "选择图片" else "替换")
+            }
+            if (asset != null) {
+                OutlinedButton(onClick = { doc.removeImage(slot) }) {
+                    Text("移除")
+                }
+            }
+        }
     }
 }
 
