@@ -20,10 +20,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,10 +36,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +63,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.sukisu.themeforge.core.CustomTextDef
+import dev.sukisu.themeforge.core.ExportOptions
 import dev.sukisu.themeforge.core.FileIo
 import dev.sukisu.themeforge.core.ThemeDocument
 import dev.sukisu.themeforge.core.ThemeSchema
@@ -80,6 +87,9 @@ fun EditorScreen(vm: EditorViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var dark by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
+    var exportOpen by remember { mutableStateOf(false) }
+    var options by remember { mutableStateOf(ExportOptions()) }
+    var exportNameInput by remember { mutableStateOf(vm.exportName()) }
 
     LaunchedEffect(vm.message) {
         vm.message?.let {
@@ -96,7 +106,7 @@ fun EditorScreen(vm: EditorViewModel) {
             busy = true
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val bytes = vm.buildPackage() ?: error("没有可导出的主题")
+                    val bytes = vm.buildPackage(options) ?: error("没有可导出的主题")
                     FileIo.write(context, uri, bytes)
                     bytes
                 }
@@ -109,17 +119,26 @@ fun EditorScreen(vm: EditorViewModel) {
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
                 title = {
                     Column {
-                        Text("ThemeForge", fontWeight = FontWeight.SemiBold)
                         Text(
                             vm.projectName,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            "adaptive · v${doc.effectiveVersion()} · ${doc.images.size} 张图",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontFamily = FontFamily.Monospace
                         )
                     }
                 },
@@ -127,13 +146,49 @@ fun EditorScreen(vm: EditorViewModel) {
                     IconButton(onClick = { vm.close() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
-                },
-                actions = {
-                    TextButton(onClick = { createLauncher.launch(vm.exportName()) }) {
-                        Text("导出")
-                    }
                 }
             )
+        },
+        bottomBar = {
+            Surface(color = MaterialTheme.colorScheme.surface) {
+                Column {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "v${doc.effectiveVersion()} · ${doc.images.size} 张图",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Text(
+                                formatBytes(doc.images.values.sumOf { it.bytes.size.toLong() }),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                exportNameInput = vm.exportName()
+                                exportOpen = true
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.FileDownload,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("导出")
+                        }
+                    }
+                }
+            }
         },
         snackbarHost = { SnackbarHost(snackbar) }
     ) { padding ->
@@ -144,8 +199,8 @@ fun EditorScreen(vm: EditorViewModel) {
         ) {
             ScrollableTabRow(
                 selectedTabIndex = tab,
-                edgePadding = 8.dp,
-                containerColor = Color.Transparent
+                edgePadding = 12.dp,
+                containerColor = MaterialTheme.colorScheme.surface
             ) {
                 TAB_TITLES.forEachIndexed { index, title ->
                     Tab(
@@ -165,11 +220,28 @@ fun EditorScreen(vm: EditorViewModel) {
                     5 -> TextsTab(doc, vm)
                     6 -> JsonTab(doc, vm)
                     else -> PreviewTab(doc, vm, dark, { dark = it }) {
-                        createLauncher.launch(vm.exportName())
+                        exportNameInput = vm.exportName()
+                        exportOpen = true
                     }
                 }
             }
         }
+    }
+
+    if (exportOpen) {
+        ExportDialog(
+            doc = doc,
+            vm = vm,
+            options = options,
+            onOptionsChange = { options = it },
+            initialName = exportNameInput,
+            onDismiss = { exportOpen = false },
+            onConfirm = { name ->
+                vm.renameProject(name.removeSuffix(".sukisu"))
+                exportOpen = false
+                createLauncher.launch(vm.exportName())
+            }
+        )
     }
 
     if (busy) {
@@ -197,6 +269,113 @@ fun EditorScreen(vm: EditorViewModel) {
             }
         )
     }
+}
+
+// ------------------------------------------------------------ export dialog
+
+@Composable
+private fun ExportDialog(
+    doc: ThemeDocument,
+    vm: EditorViewModel,
+    options: ExportOptions,
+    onOptionsChange: (ExportOptions) -> Unit,
+    initialName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    val warnings = vm.exportWarnings(options)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("导出主题包") },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 460.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("文件名") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "自适应格式",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChipSafe(
+                        selected = !options.singleVariant && options.targetVersion == 0,
+                        label = "自动"
+                    ) { onOptionsChange(options.copy(singleVariant = false, targetVersion = 0)) }
+                    listOf(3, 4, 5).forEach { version ->
+                        FilterChipSafe(
+                            selected = !options.singleVariant && options.targetVersion == version,
+                            label = "v$version"
+                        ) { onOptionsChange(options.copy(singleVariant = false, targetVersion = version)) }
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChipSafe(
+                        selected = options.singleVariant,
+                        label = "兼容 v2 单套"
+                    ) { onOptionsChange(options.copy(singleVariant = it)) }
+                }
+                Text(
+                    "内容最低需求 v${doc.requiredVersion()}，选择更低的版本会自动提升。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "包含内容",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                SwitchRow("壁纸 background", options.includeBackground) {
+                    onOptionsChange(options.copy(includeBackground = it))
+                }
+                SwitchRow("首页卡片 card_background", options.includeCardBackground) {
+                    onOptionsChange(options.copy(includeCardBackground = it))
+                }
+                SwitchRow("首页贴纸 stickers", options.includeStickers) {
+                    onOptionsChange(options.copy(includeStickers = it))
+                }
+                SwitchRow("底栏图标 bottom_bar_icon", options.includeBottomBarIcons) {
+                    onOptionsChange(options.copy(includeBottomBarIcons = it))
+                }
+                if (warnings.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "注意",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    warnings.forEach { warning ->
+                        Text(
+                            "· $warning",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (name.isNotBlank()) onConfirm(name.trim()) }
+            ) { Text("导出") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 // ---------------------------------------------------------------- basic tab
@@ -231,7 +410,7 @@ private fun BasicTab(doc: ThemeDocument, vm: EditorViewModel) {
                 options = listOf("3", "4", "5")
             ) { doc.setVersion(it.toIntOrNull() ?: ThemeSchema.MIN_VERSION) }
             Text(
-                "当前内容需求 v${doc.requiredVersion()}，导出时自动提升到最高需求版本",
+                "当前内容需求 v${doc.requiredVersion()}。导出时可固定 v3 / v4 / v5，低于需求的会自动提升；旧版 v1 / v2 会按 v2 单套格式写出。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -328,12 +507,27 @@ private fun AppearanceTab(
     TabColumn {
         SectionCard("明暗选择", "浅色与深色的颜色、图片、布局完全独立") {
             ModeChips(dark = dark, onChange = onDarkChange)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    doc.copyVariant(dark, !dark)
+                    vm.notify("已把${if (dark) "深色" else "浅色"}配置同步到${if (dark) "浅色" else "深色"}")
+                }
+            ) {
+                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("配置复制到${if (dark) "浅色" else "深色"}")
+            }
         }
         SectionCard("配色") {
             ColorField(
                 label = "强调色 keyColor",
                 argb = argbOf(doc.int(dark, "keyColor", 0xFF007AFF.toInt()))
             ) { doc.put(dark, "keyColor", it.toInt()) }
+            QuickColorPresets { color ->
+                doc.putBoth("keyColor", color.toInt())
+                vm.notify("已把强调色应用到明暗两套")
+            }
             ChoiceRow(
                 label = "配色风格 colorStyle",
                 value = doc.string(dark, "colorStyle", "TonalSpot"),
@@ -448,8 +642,19 @@ private fun HomeTab(
     onDarkChange: (Boolean) -> Unit
 ) {
     TabColumn {
-        SectionCard("明暗选择") {
+        SectionCard("明暗选择", "布局与状态区参数按模式独立保存") {
             ModeChips(dark = dark, onChange = onDarkChange)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    doc.copyVariant(dark, !dark)
+                    vm.notify("已把${if (dark) "深色" else "浅色"}首页配置同步到另一模式")
+                }
+            ) {
+                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("配置复制到${if (dark) "浅色" else "深色"}")
+            }
         }
         SectionCard("首页布局") {
             ChoiceRow(
@@ -544,6 +749,17 @@ private fun DockTab(
         }
         SectionCard("明暗选择", "底栏行为开关按浅色 / 深色独立保存") {
             ModeChips(dark = dark, onChange = onDarkChange)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    doc.copyVariant(dark, !dark)
+                    vm.notify("已把${if (dark) "深色" else "浅色"}底栏配置同步到另一模式")
+                }
+            ) {
+                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("配置复制到${if (dark) "浅色" else "深色"}")
+            }
         }
         SectionCard("底栏行为") {
             SwitchRow(
@@ -602,6 +818,17 @@ private fun ImagesTab(
     TabColumn {
         SectionCard("明暗选择", "图片按浅色 / 深色分别存储") {
             ModeChips(dark = dark, onChange = onDarkChange)
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    doc.copyModeImages(dark, !dark)
+                    vm.notify("已把${if (dark) "深色" else "浅色"}图片复制到另一模式")
+                }
+            ) {
+                Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("图片复制到${if (dark) "浅色" else "深色"}")
+            }
         }
         SectionCard("壁纸与首页卡片") {
             ImageSlotCard(

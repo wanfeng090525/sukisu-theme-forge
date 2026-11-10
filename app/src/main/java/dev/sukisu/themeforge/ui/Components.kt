@@ -68,13 +68,22 @@ fun SectionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant,
+                RoundedCornerShape(16.dp)
+            )
             .padding(16.dp)
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold
+        )
         if (subtitle != null) {
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(3.dp))
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
@@ -349,8 +358,13 @@ fun ImageSlotCard(
         Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(
+                1.dp,
+                MaterialTheme.colorScheme.outlineVariant,
+                RoundedCornerShape(12.dp)
+            )
             .padding(12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -394,12 +408,47 @@ fun ImageSlotCard(
     }
 }
 
+@Composable
+fun QuickColorPresets(onPick: (Long) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        ACCENT_PRESETS.forEach { (name, color) ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Color(color.toInt()))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                        .clickable { onPick(color) }
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
 fun parseColor(input: String): Long? {
     val text = input.trim().removePrefix("#")
     if (text.length != 6 && text.length != 8) return null
     val value = text.toLongOrNull(16) ?: return null
     return if (text.length == 6) 0xFF000000L or value else value
 }
+
+private val ACCENT_PRESETS = listOf(
+    "iOS 蓝" to 0xFF007AFFL,
+    "靛蓝" to 0xFF5B5BD6L,
+    "翡翠" to 0xFF10B981L,
+    "紫罗兰" to 0xFFA855F7L,
+    "琥珀" to 0xFFF59E0BL
+)
 
 private val PRESET_COLORS = listOf(
     0xFF0F766EL, 0xFF007AFFL, 0xFF2DD4BFL, 0xFF6366F1L,

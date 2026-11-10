@@ -56,6 +56,9 @@ class ThemeDocument private constructor(
     var revision by mutableIntStateOf(0)
         private set
 
+    /** Set by the packager when an import needed an automatic format upgrade. */
+    var importNote: String? = null
+
     fun touch() {
         revision++
     }
@@ -166,6 +169,48 @@ class ThemeDocument private constructor(
 
     fun clearBottomBarIcons() {
         images.keys.filter { ThemeSlots.isBottomBarIcon(it) }.forEach { images.remove(it) }
+        syncMeta()
+    }
+
+    /** Copies every config field of one variant onto the other. */
+    fun copyVariant(fromDark: Boolean, toDark: Boolean) {
+        if (fromDark == toDark) return
+        val source = JSONObject(variant(fromDark).toString())
+        val target = variant(toDark)
+        val keys = target.keys()
+        val existing = ArrayList<String>()
+        while (keys.hasNext()) existing.add(keys.next())
+        existing.forEach { target.remove(it) }
+        val sourceKeys = source.keys()
+        while (sourceKeys.hasNext()) {
+            val key = sourceKeys.next()
+            target.put(key, source.get(key))
+        }
+        syncMeta()
+        touch()
+    }
+
+    /** Copies the image set of one variant onto the other. */
+    fun copyModeImages(fromDark: Boolean, toDark: Boolean) {
+        if (fromDark == toDark) return
+        val sourceMode = ThemeSlots.mode(fromDark)
+        val sourceSlots = ThemeSlots.all.filter {
+            !ThemeSlots.isBottomBarIcon(it) &&
+                (it.endsWith("_$sourceMode") || it.contains("_${sourceMode}_"))
+        }
+        for (slot in sourceSlots) {
+            val target = when {
+                slot.startsWith("background_") -> ThemeSlots.background(toDark)
+                slot.startsWith("card_background_") -> ThemeSlots.card(toDark)
+                slot.startsWith("card_sticker_") -> {
+                    val index = slot.substringAfterLast('_').toIntOrNull() ?: continue
+                    ThemeSlots.sticker(toDark, index)
+                }
+                else -> continue
+            }
+            val asset = images[slot] ?: continue
+            images[target] = ImageAsset(asset.bytes, target, asset.width, asset.height)
+        }
         syncMeta()
     }
 
@@ -292,19 +337,20 @@ class ThemeDocument private constructor(
     // ---- whole-document -----------------------------------------------------
 
     fun replaceRoot(newRoot: JSONObject) {
-        val newVersion = newRoot.optInt("version", 0)
+        val normalized = if (ThemeSchema.isLegacy(newRoot)) ThemeSchema.upgradeLegacy(newRoot) else newRoot
+        val newVersion = normalized.optInt("version", 0)
         require(newVersion in ThemeSchema.MIN_VERSION..ThemeSchema.MAX_VERSION) {
-            "仅支持 v3 - v5 主题包（当前 v$newVersion）"
+            "仅支持 v1 - v5 主题包（当前 v$newVersion）"
         }
-        require(newRoot.optBoolean("adaptive", false)) { "仅支持 adaptive 自适应主题包" }
+        require(normalized.optBoolean("adaptive", false)) { "仅支持 adaptive 自适应主题包" }
         val oldKeys = ArrayList<String>()
         val iterator = root.keys()
         while (iterator.hasNext()) oldKeys.add(iterator.next())
         oldKeys.forEach { root.remove(it) }
-        val newKeys = newRoot.keys()
+        val newKeys = normalized.keys()
         while (newKeys.hasNext()) {
             val key = newKeys.next()
-            root.put(key, newRoot.get(key))
+            root.put(key, normalized.get(key))
         }
         syncMeta()
     }

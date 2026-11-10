@@ -20,6 +20,62 @@ object ThemeSchema {
     const val MIN_VERSION = 3
     const val MAX_VERSION = 5
 
+    /** v1 / v2 are the legacy single-variant formats kept for import and compatibility export. */
+    const val LEGACY_MIN_VERSION = 1
+    const val LEGACY_MAX_VERSION = 2
+
+    /** ZIP entries used by v1 / v2 packages (one image set, no light/dark split). */
+    val LEGACY_ENTRIES: List<String> = buildList {
+        add("background")
+        add("card_background")
+        for (i in 0 until STICKER_COUNT) add("card_sticker_$i")
+    }
+
+    /** Top-level keys that are shared by both variants (or describe the package itself). */
+    val GLOBAL_KEYS = setOf(
+        "version", "adaptive", "light", "dark",
+        "appIconId", "customHomeTitle", "customTexts", "bottomBarIcons", "appearance",
+        "moduleSortEnabledFirst", "moduleSortActionFirst", "moduleSortWebUiFirst",
+        "moduleSortZygiskFirst", "moduleSortMetamoduleFirst", "moduleSortNameOrder",
+        "moduleSortManual"
+    )
+
+    fun isLegacy(root: JSONObject): Boolean =
+        root.optInt("version", LEGACY_MIN_VERSION) < 3 || !root.optBoolean("adaptive", false)
+
+    /**
+     * Converts a v1 / v2 (or non-adaptive) theme.json into the v3 adaptive shape.
+     *
+     * The legacy variant is shared by light and dark; images are duplicated by the packager.
+     * Fields the legacy format cannot express (bottom bar icons, appearance) are dropped and
+     * reported by the caller.
+     */
+    fun upgradeLegacy(root: JSONObject): JSONObject {
+        if (!isLegacy(root)) return JSONObject(root.toString())
+        val out = JSONObject()
+        out.put("version", MIN_VERSION)
+        out.put("adaptive", true)
+        for (key in GLOBAL_KEYS) {
+            if (key == "version" || key == "adaptive" || key == "light" || key == "dark") continue
+            if (key == "bottomBarIcons") continue
+            val value = root.opt(key) ?: continue
+            if (value == JSONObject.NULL) continue
+            out.put(key, value)
+        }
+        val variant = JSONObject()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            if (key in GLOBAL_KEYS) continue
+            val value = root.opt(key) ?: continue
+            if (value == JSONObject.NULL) continue
+            variant.put(key, value)
+        }
+        out.put("light", JSONObject(variant.toString()))
+        out.put("dark", JSONObject(variant.toString()))
+        return out
+    }
+
     val APP_ICONS = listOf("default", "kernelsu", "sukisu_logo", "zako")
 
     val COLOR_STYLES = listOf(
