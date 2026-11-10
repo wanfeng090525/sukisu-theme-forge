@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
                 if (doc == null) {
                     HomeScreen(vm)
                 } else {
-                    EditorScreen(vm, doc)
+                    EditorScreen(vm)
                 }
             }
         }

@@ -297,8 +297,10 @@ class ThemeDocument private constructor(
             "仅支持 v3 - v5 主题包（当前 v$newVersion）"
         }
         require(newRoot.optBoolean("adaptive", false)) { "仅支持 adaptive 自适应主题包" }
-        val keys = root.keySet().toList()
-        keys.forEach { root.remove(it) }
+        val oldKeys = ArrayList<String>()
+        val iterator = root.keys()
+        while (iterator.hasNext()) oldKeys.add(iterator.next())
+        oldKeys.forEach { root.remove(it) }
         val newKeys = newRoot.keys()
         while (newKeys.hasNext()) {
             val key = newKeys.next()

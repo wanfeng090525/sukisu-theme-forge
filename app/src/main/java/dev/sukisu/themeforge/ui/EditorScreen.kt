@@ -405,6 +405,7 @@ private fun AppearanceTab(
                             val hex = defaults.optJSONObject("colors")
                                 ?.optJSONObject(overlayMode)
                                 ?.optString(token.key, "")
+                                .orEmpty()
                             if (hex.isNotBlank()) doc.setAppearanceColor(overlayMode, token.key, hex)
                         }
                         vm.notify("已恢复 $overlayMode 默认外观色")

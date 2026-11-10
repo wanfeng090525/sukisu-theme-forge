@@ -124,7 +124,7 @@ fun PreviewCard(doc: ThemeDocument, dark: Boolean, modifier: Modifier = Modifier
                 val asset = doc.images[ThemeSlots.sticker(dark, index)] ?: continue
                 val bitmap = remember(asset) { ImageInfo.preview(asset.bytes, 640) } ?: continue
                 val transform = doc.stickerTransform(dark, index)
-                val stickerSize = (transform.optDouble("size", 0.16).toFloat()).coerceIn(0.05f, 0.5f) * width
+                val stickerSize = width * (transform.optDouble("size", 0.16).toFloat()).coerceIn(0.05f, 0.5f)
                 Image(
                     bitmap = bitmap,
                     contentDescription = null,
