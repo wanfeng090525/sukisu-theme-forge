@@ -154,7 +154,7 @@ private fun loadTransforms(doc: ThemeDocument, dark: Boolean): List<StickerTrans
             StickerTransform(
                 x = item?.optDouble("offsetX", 0.0)?.toFloat() ?: 0f,
                 y = item?.optDouble("offsetY", 0.0)?.toFloat() ?: 0f,
-                size = max(0.06, item?.optDouble("size", 0.20)?.toFloat() ?: 0.20f)
+                size = max(0.06f, item?.optDouble("size", 0.20)?.toFloat() ?: 0.20f)
             )
         }
     }
